@@ -6,16 +6,11 @@ import {
 	addToast
 } from "@heroui/react";
 import NavbarComponent from "@/components/Navbar";
-import { CardComponent } from "@/components/Card";
 import { Textarea } from "@heroui/react";
-import { ThemeSwitch } from "@/components/theme-switch";
-import { FaClipboard } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 export default function App() {
-	const { isOpen, onOpen, onOpenChange } = useDisclosure();
 	const [text, setText] = useState("");
-	const [copied, setCopied] = useState(false);
 	const { status, data: session } = useSession();
 	const router = useRouter();
 
@@ -37,12 +32,6 @@ export default function App() {
 	if (status !== "authenticated") {
 		return null;
 	}
-
-	// const copyToClipboard = () => {
-	// 	navigator.clipboard.writeText(text);
-	// 	setCopied(true);
-	// 	setTimeout(() => setCopied(false), 1500);
-	// };
 
 	const pasteFromClipboard = async () => {
 		try {
@@ -121,7 +110,7 @@ export default function App() {
 
 	return (
 		<>
-			<NavbarComponent/>
+			<NavbarComponent />
 			<div className="flex gap-3 justify-center min-h-screen">
 				<div className="flex flex-col gap-4 p-8 w-full ">
 					{/* <Input label="Title" type="text" required value={title} onChange={e => setTitle(e.target.value)} /> */}
@@ -136,13 +125,10 @@ export default function App() {
 						<Button color="secondary" onPress={pasteFromClipboard}>
 							Paste from Clipboard
 						</Button>
-						<Button color="primary" onPress={() => handleUpload()} disabled={!text || !session?.user?.userId}>
+						<Button color="primary" onPress={() => handleUpload()} disabled={!text}>
 							Upload
 						</Button>
 					</div>
-					{copied && (
-						<span className="text-green-500 font-medium">Copied!</span>
-					)}
 				</div>
 			</div>
 		</>

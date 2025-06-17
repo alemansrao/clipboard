@@ -1,12 +1,22 @@
 import ConnectMongoDb from "@/lib/mongodb";
 import Post from "@/models/posts";
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../auth/[...nextauth]/route";
+
+// Helper to check authentication
+async function requireAuth(request) {
+	const session = await getServerSession(authOptions);
+	if (!session || !session.user || !session.user.userId) {
+		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+	}
+	return session;
+}
 
 // POST: Create a new post
 export async function POST(request) {
-	// Require authentication
-	// const authResult = await requireAuth(request);
-	// if (authResult instanceof NextResponse) return authResult;
+	const session = await requireAuth(request);
+	if (session instanceof NextResponse) return session;
 
 	try {
 		const body = await request.json();
@@ -67,6 +77,9 @@ export async function POST(request) {
 
 // GET: Fetch all posts
 export async function GET(request) {
+	const session = await requireAuth(request);
+	if (session instanceof NextResponse) return session;
+
 	try {
 		await ConnectMongoDb();
 		const { searchParams } = new URL(request.url);
@@ -100,6 +113,9 @@ export async function GET(request) {
 
 // Delete: Delete a post by ID
 export async function DELETE(request) {
+	const session = await requireAuth(request);
+	if (session instanceof NextResponse) return session;
+
 	try {
 		const { post_id } = await request.json();
 		if (!post_id) {
@@ -122,6 +138,9 @@ export async function DELETE(request) {
 
 // PUT: Toggle favorite status
 export async function PUT(request) {
+	const session = await requireAuth(request);
+	if (session instanceof NextResponse) return session;
+
 	try {
 		const { post_id, favorite, _id } = await request.json();
 		// Accept either _id or post_id for update
