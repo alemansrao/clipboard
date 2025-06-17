@@ -147,7 +147,7 @@ export default function App() {
 
       <div className="flex-wrap flex gap-3 content-start items-start justify-center min-h-screen">
         {loading ? (
-          <CardComponent title="Loading..." description="Loading your posts..." />
+          <CardComponent title="Loading..." description="Loading your posts..." empty={true} />
         ) : posts.length === 0 ? (
           <CardComponent
             title="No posts yet"
