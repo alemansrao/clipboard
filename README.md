@@ -84,6 +84,22 @@ The Clipboard project is a modern web application designed to manage, store, and
 
 ---
 
+## Environment Variables
+
+You must define the following 5 keys in a `.env` file at the project root:
+
+```env
+MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/dbname
+JWT_SECRET=your_jwt_secret
+NEXTAUTH_URL=http://localhost:3000
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+```
+
+Replace the example values with your actual credentials.
+
+---
+
 ## Getting Started
 
 1. **Install dependencies**: `npm install`
