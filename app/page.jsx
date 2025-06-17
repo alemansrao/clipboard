@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import {
   useDisclosure,
-  addToast,Divider
+  addToast, Divider
 } from "@heroui/react";
 import { CardComponent } from "@/components/Card";
 import NavbarComponent from "@/components/Navbar";
@@ -128,7 +128,12 @@ export default function App() {
 
   if (status === "loading") {
     return (
-      <CardComponent title="Loading..." description="Checking authentication..." />
+      <>
+        <NavbarComponent />
+        <div className="flex-wrap flex gap-3 content-start items-start justify-center min-h-screen">
+          <CardComponent title="Loading..." description="Checking authentication..." empty={true} />
+        </div>
+      </>
     );
   }
 
@@ -139,7 +144,7 @@ export default function App() {
   return (
     <>
       <NavbarComponent />
-      
+
       <div className="flex-wrap flex gap-3 content-start items-start justify-center min-h-screen">
         {loading ? (
           <CardComponent title="Loading..." description="Loading your posts..." />
