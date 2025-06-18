@@ -1,9 +1,9 @@
 "use client";
-import { Card, CardHeader, CardBody, Divider} from "@heroui/react";
+import { Card, CardHeader, CardBody, Divider } from "@heroui/react";
 import { FaRegTrashAlt, FaHeart, FaRegHeart } from "react-icons/fa";
 import { useState } from "react";
 import { addToast } from "@heroui/react";
-export function CardComponent({ title, description, onDelete, isFavorite, toggleFavorite,empty = false }) {
+export function CardComponent({ title, description, onDelete, isFavorite, toggleFavorite, empty = false }) {
   const [showFullDescription, setShowFullDescription] = useState(false);
 
   const toggleDescription = () => {
@@ -15,10 +15,24 @@ export function CardComponent({ title, description, onDelete, isFavorite, toggle
   const copyToClipboard = () => {
     navigator.clipboard.writeText(description);
     addToast({
-            title: "Content copied to clipboard",
-            timeout: 2000,
-            shouldShowTimeoutProgress: true,
-          });
+      title: "Content copied to clipboard",
+      timeout: 2000,
+      shouldShowTimeoutProgress: true,
+    });
+  };
+
+  // Prevent deletion of favorited card
+  const handleDelete = () => {
+    if (isFavorite) {
+      addToast({
+        title: "Cannot delete a favorited card",
+        timeout: 2000,
+        shouldShowTimeoutProgress: true,
+        color: "warning",
+      });
+      return;
+    }
+    onDelete();
   };
 
   return (
@@ -45,7 +59,7 @@ export function CardComponent({ title, description, onDelete, isFavorite, toggle
                 size={16}
                 color="#fa1e53"
                 style={{ cursor: "pointer" }}
-                onClick={onDelete}
+                onClick={handleDelete}
               />
             </>
           )}
