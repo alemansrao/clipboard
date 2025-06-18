@@ -77,14 +77,18 @@ export async function POST(request) {
 
 // GET: Fetch all posts
 export async function GET(request) {
-	const session = await requireAuth(request);
-	if (session instanceof NextResponse) return session;
+	const { searchParams } = new URL(request.url);
+	const post_id = searchParams.get("post_id");
+	const user_id = searchParams.get("user_id");
+
+	// If post_id is not present, require authentication
+	if (!post_id) {
+		const session = await requireAuth(request);
+		if (session instanceof NextResponse) return session;
+	}
 
 	try {
 		await ConnectMongoDb();
-		const { searchParams } = new URL(request.url);
-		const post_id = searchParams.get("post_id");
-		const user_id = searchParams.get("user_id");
 		console.log("Fetching posts with params:", { post_id, user_id });
 		if (post_id) {
 			// Always capitalize post_id for search
