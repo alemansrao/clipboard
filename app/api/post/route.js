@@ -2,7 +2,7 @@ import ConnectMongoDb from "@/lib/mongodb";
 import Post from "@/models/posts";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../auth/[...nextauth]/route";
+import authOptions from "@/lib/authOptions";
 
 // Helper to check authentication
 async function requireAuth(request) {
