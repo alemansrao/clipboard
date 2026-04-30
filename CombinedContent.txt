@@ -1,0 +1,1663 @@
+######## CombinedContent.txt ########
+Root: ./
+Generated: 2026-04-30 17:24:06
+Included folders: app; components; lib; models,styles
+Included files: 
+Ignored: dot-folders (.*), node_modules, gitignore patterns
+####################################
+
+######## FOLDER STRUCTURE ########
+EXCLUDED DIR .git
+EXCLUDED DIR .next
+DIR app
+DIR components
+DIR lib
+DIR models
+EXCLUDED DIR node_modules
+DIR styles
+FILE .env
+FILE .gitignore
+FILE Combine-FolderContents.ps1
+FILE CombinedContent.txt
+FILE jsconfig.json
+FILE next.config.js
+FILE package-lock.json
+FILE package.json
+FILE postcss.config.js
+FILE README.md
+FILE SECURITY_AUDIT.md
+##################################
+
+===== FILE START: app\%5Bid%5D\page.jsx =====
+===== FILE CONTENT BELOW =====
+import { notFound } from 'next/navigation';
+import ConnectMongoDb from '@/lib/db';
+import Post from '@/models/Post';
+import PublicPostView from '@/components/posts/PublicPostView';
+
+export default async function PublicPostPage({ params }) {
+  await ConnectMongoDb();
+
+  const { id } = await params;
+
+  const post = await Post.findOne({
+    shareId: String(id).toUpperCase(),
+  }).lean();
+
+  if (!post) {
+    notFound();
+  }
+
+  return (
+    <PublicPostView
+      post={{
+        shareId: post.shareId,
+        content: post.content,
+        createdAt: post.createdAt?.toISOString(),
+      }}
+    />
+  );
+}
+===== FILE END =====
+
+===== FILE START: app\add\page.jsx =====
+===== FILE CONTENT BELOW =====
+import { redirect } from 'next/navigation';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import AppShell from '@/components/layout/AppShell';
+import CreatePostForm from '@/components/posts/CreatePostForm';
+
+export default async function AddPage() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.userId) {
+    redirect('/login');
+  }
+
+  return (
+    <AppShell session={session}>
+      <section className="mx-auto w-full max-w-3xl">
+        <div className="mb-8">
+          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Create</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">Save something worth keeping</h1>
+          <p className="mt-3 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+            Paste a note, snippet, or temporary content. Everything is stored privately under your account.
+          </p>
+        </div>
+        <CreatePostForm />
+      </section>
+    </AppShell>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: app\api\auth\signup\route.js =====
+===== FILE CONTENT BELOW =====
+import bcrypt from 'bcryptjs';
+import { NextResponse } from 'next/server';
+import ConnectMongoDb from '@/lib/db';
+import { validateSignupInput } from '@/lib/validators';
+import User from '@/models/User';
+
+export async function POST(request) {
+  try {
+    const payload = await request.json();
+    const parsed = validateSignupInput(payload);
+
+    await ConnectMongoDb();
+    const existingUser = await User.findOne({ email: parsed.email });
+
+    if (existingUser) {
+      return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 });
+    }
+
+    const passwordHash = await bcrypt.hash(parsed.password, 12);
+
+    await User.create({
+      userName: parsed.userName,
+      email: parsed.email,
+      passwordHash,
+      authProviders: ['credentials'],
+      role: 'user'
+    });
+
+    return NextResponse.json({ message: 'Account created successfully.' }, { status: 201 });
+  } catch (error) {
+    const message = error?.message || 'Unable to create account.';
+    const status = message.includes('Invalid') ? 400 : 500;
+    return NextResponse.json({ error: message }, { status });
+  }
+}
+
+===== FILE END =====
+
+===== FILE START: app\api\posts\%5Bid%5D\route.js =====
+===== FILE CONTENT BELOW =====
+import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
+import ConnectMongoDb from '@/lib/db';
+import { requireUserSession } from '@/lib/session';
+import { validateFavoriteFlag } from '@/lib/validators';
+import Post from '@/models/Post';
+
+export async function GET(_request, { params }) {
+  try {
+    await ConnectMongoDb();
+    const { id } = await params;
+    const shareId = String(id).toUpperCase();
+
+    const post = await Post.findOne({ shareId }).lean();
+    if (!post) {
+      return NextResponse.json({ error: 'Post not found.' }, { status: 404 });
+    }
+
+    return NextResponse.json(
+      {
+        shareId: post.shareId,
+        content: post.content,
+        createdAt: post.createdAt,
+      },
+      { status: 200 }
+    );
+  } catch {
+    return NextResponse.json({ error: 'Unable to fetch post.' }, { status: 500 });
+  }
+}
+
+export async function DELETE(_request, { params }) {
+  try {
+    const { id } = await params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: 'Invalid post id.' }, { status: 400 });
+    }
+
+    const session = await requireUserSession();
+    await ConnectMongoDb();
+
+    const deletedPost = await Post.findOneAndDelete({
+      _id: id,
+      ownerId: session.user.userId,
+    });
+
+    if (!deletedPost) {
+      return NextResponse.json({ error: 'Post not found.' }, { status: 404 });
+    }
+
+    return NextResponse.json({ message: 'Post deleted.' }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error.message || 'Unable to delete post.' },
+      { status: error.message === 'Unauthorized' ? 401 : 500 }
+    );
+  }
+}
+
+export async function PATCH(request, { params }) {
+  try {
+    const { id } = await params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: 'Invalid post id.' }, { status: 400 });
+    }
+
+    const session = await requireUserSession();
+    const body = await request.json();
+    const favorite = validateFavoriteFlag(body?.favorite);
+    await ConnectMongoDb();
+
+    const updatedPost = await Post.findOneAndUpdate(
+      { _id: id, ownerId: session.user.userId },
+      { favorite },
+      { new: true }
+    ).lean();
+
+    if (!updatedPost) {
+      return NextResponse.json({ error: 'Post not found.' }, { status: 404 });
+    }
+
+    return NextResponse.json(
+      { ...updatedPost, _id: updatedPost._id.toString() },
+      { status: 200 }
+    );
+  } catch (error) {
+    const status =
+      error.message === 'Unauthorized'
+        ? 401
+        : error.message.startsWith('Invalid')
+        ? 400
+        : 500;
+
+    return NextResponse.json(
+      { error: error.message || 'Unable to update post.' },
+      { status }
+    );
+  }
+}
+===== FILE END =====
+
+===== FILE START: app\api\posts\route.js =====
+===== FILE CONTENT BELOW =====
+import { NextResponse } from 'next/server';
+import ConnectMongoDb from '@/lib/db';
+import { requireUserSession } from '@/lib/session';
+import { createShareId } from '@/lib/ids';
+import { validatePostContent } from '@/lib/validators';
+import Post from '@/models/Post';
+export async function GET() {
+  try {
+    const session = await requireUserSession();
+    await ConnectMongoDb();
+
+    const posts = await Post.find({ ownerId: session.user.userId })
+      .sort({ favorite: -1, createdAt: -1 })
+      .lean();
+
+    const normalizedPosts = posts.map((post) => ({
+      ...post,
+      _id: post._id.toString()
+    }));
+
+    return NextResponse.json(normalizedPosts, { status: 200 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error.message || 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+}
+
+export async function POST(request) {
+  try {
+    const session = await requireUserSession();
+    const body = await request.json();
+    const content = validatePostContent(body?.content);
+
+    await ConnectMongoDb();
+
+    let shareId = '';
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const candidate = createShareId();
+      const existing = await Post.exists({ shareId: candidate });
+      if (!existing) {
+        shareId = candidate;
+        break;
+      }
+    }
+
+    if (!shareId) {
+      throw new Error('Unable to generate a unique share id.');
+    }
+
+    const post = await Post.create({
+      shareId,
+      content,
+      ownerId: session.user.userId,
+      favorite: false
+    });
+
+    return NextResponse.json(post, { status: 201 });
+  } catch (error) {
+    const status = error.message === 'Unauthorized' ? 401 : error.message.startsWith('Invalid') ? 400 : 500;
+    return NextResponse.json({ error: error.message || 'Unable to create post.' }, { status });
+  }
+}
+
+===== FILE END =====
+
+===== FILE START: app\error.jsx =====
+===== FILE CONTENT BELOW =====
+'use client';
+
+import { useEffect } from 'react';
+
+export default function Error({ error, reset }) {
+  useEffect(() => {
+    console.error(error);
+  }, [error]);
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-6 dark:bg-zinc-950">
+      <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">Something went wrong</h2>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          An unexpected error occurred while loading this page.
+        </p>
+        <button
+          type="button"
+          onClick={() => reset()}
+          className="mt-4 inline-flex h-10 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+        >
+          Try again
+        </button>
+      </div>
+    </main>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: app\layout.jsx =====
+===== FILE CONTENT BELOW =====
+import '@/styles/globals.css';
+import { Inter } from 'next/font/google';
+import { Providers } from './providers';
+
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata = {
+  title: 'Clipboard Vault',
+  description: 'A secure and minimal clipboard manager.'
+};
+
+export const viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#fafafa' },
+    { media: '(prefers-color-scheme: dark)', color: '#09090b' }
+  ]
+};
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: app\login\page.jsx =====
+===== FILE CONTENT BELOW =====
+import { redirect } from 'next/navigation';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import AuthCard from '@/components/ui/AuthCard';
+import LoginForm from '@/components/ui/LoginForm';
+
+export default async function LoginPage() {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.userId) {
+    redirect('/');
+  }
+
+  return (
+    <AuthCard
+      title="Welcome back"
+      subtitle="Sign in with Google or your email and password."
+      footerText="New here?"
+      footerLink="/signup"
+      footerLabel="Create an account"
+    >
+      <LoginForm />
+    </AuthCard>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: app\logout\page.jsx =====
+===== FILE CONTENT BELOW =====
+'use client';
+
+import { useEffect } from 'react';
+import { signOut } from 'next-auth/react';
+
+export default function LogoutPage() {
+  useEffect(() => {
+    signOut({ callbackUrl: '/login' });
+  }, []);
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-6 text-sm text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
+      Signing you out...
+    </main>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: app\not-found.jsx =====
+===== FILE CONTENT BELOW =====
+import Link from 'next/link';
+
+export default function NotFound() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-6 dark:bg-zinc-950">
+      <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">404</p>
+        <h1 className="mt-2 text-2xl font-semibold text-zinc-950 dark:text-zinc-50">Post not found</h1>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          The shared content does not exist or may have been removed.
+        </p>
+        <Link
+          href="/"
+          className="mt-4 inline-flex h-10 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+        >
+          Go home
+        </Link>
+      </div>
+    </main>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: app\page.jsx =====
+===== FILE CONTENT BELOW =====
+import { redirect } from 'next/navigation';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import AppShell from '@/components/layout/AppShell';
+import Dashboard from '@/components/posts/Dashboard';
+
+export default async function HomePage() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.userId) {
+    redirect('/login');
+  }
+
+  return (
+    <AppShell session={session}>
+      <Dashboard />
+    </AppShell>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: app\providers.jsx =====
+===== FILE CONTENT BELOW =====
+'use client';
+
+import { SessionProvider } from 'next-auth/react';
+import { ThemeProvider } from 'next-themes';
+
+export function Providers({ children }) {
+  return (
+    <SessionProvider>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        {children}
+      </ThemeProvider>
+    </SessionProvider>
+  );
+}
+===== FILE END =====
+
+===== FILE START: app\signup\page.jsx =====
+===== FILE CONTENT BELOW =====
+import { redirect } from 'next/navigation';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import AuthCard from '@/components/ui/AuthCard';
+import SignupForm from '@/components/ui/SignupForm';
+
+export default async function SignupPage() {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.userId) {
+    redirect('/');
+  }
+
+  return (
+    <AuthCard
+      title="Create your account"
+      subtitle="A minimal clipboard manager with secure sharing."
+      footerText="Already have an account?"
+      footerLink="/login"
+      footerLabel="Sign in"
+    >
+      <SignupForm />
+    </AuthCard>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: components\layout\AppShell.jsx =====
+===== FILE CONTENT BELOW =====
+import Navbar from '@/components/layout/Navbar';
+
+export default function AppShell({ children, session }) {
+  return (
+    <div className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
+      <Navbar session={session} />
+      <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">{children}</main>
+    </div>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: components\layout\Navbar.jsx =====
+===== FILE CONTENT BELOW =====
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { signOut } from 'next-auth/react';
+import ThemeToggle from '@/components/ui/ThemeToggle';
+
+const items = [
+  { href: '/', label: 'Dashboard' },
+  { href: '/add', label: 'Create' }
+];
+
+export default function Navbar({ session }) {
+  const pathname = usePathname();
+
+  return (
+    <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-zinc-50/90 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-950/90">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-6">
+          <Link href="/" className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+            Clipboard Vault
+          </Link>
+          <nav className="hidden items-center gap-2 md:flex">
+            {items.map((item) => {
+              const active = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`rounded-xl px-3 py-2 text-sm transition ${
+                    active
+                      ? 'bg-zinc-950 text-white dark:bg-zinc-100 dark:text-zinc-950'
+                      : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          {session?.user?.name ? (
+            <span className="hidden text-sm text-zinc-500 dark:text-zinc-400 sm:inline">{session.user.name}</span>
+          ) : null}
+          {session?.user?.userId ? (
+            <button
+              type="button"
+              onClick={() => signOut({ callbackUrl: '/login' })}
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-200 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
+            >
+              Logout
+            </button>
+          ) : (
+            <Link
+              href="/login"
+              className="inline-flex h-10 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+            >
+              Login
+            </Link>
+          )}
+        </div>
+      </div>
+
+      <div className="border-t border-zinc-200 px-4 py-3 md:hidden dark:border-zinc-800">
+        <nav className="flex items-center gap-2">
+          {items.map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`rounded-xl px-3 py-2 text-sm transition ${
+                  active
+                    ? 'bg-zinc-950 text-white dark:bg-zinc-100 dark:text-zinc-950'
+                    : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+    </header>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: components\posts\CreatePostForm.jsx =====
+===== FILE CONTENT BELOW =====
+'use client';
+
+import { useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import StatusBanner from '@/components/ui/StatusBanner';
+
+export default function CreatePostForm() {
+  const router = useRouter();
+  const [content, setContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [tone, setTone] = useState('success');
+  const formRef = useRef(null);
+  const remaining = useMemo(() => 5000 - content.length, [content.length]);
+
+  const pasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const trimmedText = text.trim();
+
+      if (!trimmedText || submitting) return;
+
+      setContent(text);
+
+      setSubmitting(true);
+      setMessage('');
+
+      const response = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: trimmedText }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Unable to create item.');
+      }
+
+      router.push('/');
+      router.refresh();
+    } catch (error) {
+      setTone('error');
+      setMessage(error.message || 'Unable to create item.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSubmitting(true);
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Unable to create item.');
+      }
+
+      router.push('/');
+      router.refresh();
+    } catch (error) {
+      setTone('error');
+      setMessage(error.message || 'Unable to create item.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form ref={formRef} onSubmit={handleSubmit} className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
+      <label className="block">
+        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Content</span>
+        <textarea
+          value={content}
+          onChange={(event) => setContent(event.target.value)}
+          placeholder="Paste your content here"
+          rows={14}
+          maxLength={5000}
+          className="mt-3 w-full rounded-2xl border border-zinc-200 bg-transparent px-4 py-3 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-400 dark:border-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-zinc-600"
+        />
+      </label>
+
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className={`text-xs ${remaining < 0 ? 'text-red-600 dark:text-red-300' : 'text-zinc-500 dark:text-zinc-400'}`}>
+          {remaining} characters remaining
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={pasteFromClipboard}
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 px-4 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            Paste from clipboard
+          </button>
+          <button
+            type="submit"
+            disabled={submitting || !content.trim() || remaining < 0}
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+          >
+            {submitting ? 'Savingâ€¦' : 'Save item'}
+          </button>
+        </div>
+      </div>
+
+      {message ? <div className="mt-4"><StatusBanner tone={tone} message={message} /></div> : null}
+    </form>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: components\posts\Dashboard.jsx =====
+===== FILE CONTENT BELOW =====
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import EmptyState from '@/components/ui/EmptyState';
+import PostCard from '@/components/posts/PostCard';
+import StatusBanner from '@/components/ui/StatusBanner';
+
+export default function Dashboard() {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadPosts = useCallback(async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/posts', { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Unable to fetch posts.');
+      }
+      setPosts(
+        (Array.isArray(data) ? data : []).map((post) => ({
+          ...post,
+          _id: post?._id ?? post?.id ?? ''
+        }))
+      );
+    } catch (err) {
+      setError(err.message || 'Unable to fetch posts.');
+      setPosts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
+
+  const favoriteCount = useMemo(() => posts.filter((post) => post.favorite).length, [posts]);
+
+  async function handleDelete(id) {
+    if (!id) {
+      setError('Missing post id.');
+      return;
+    }
+
+    const previous = posts;
+    setPosts((current) => current.filter((post) => post._id !== id));
+
+    try {
+      const response = await fetch(`/api/posts/${id}`, { method: 'DELETE' });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Unable to delete post.');
+      }
+    } catch (err) {
+      setPosts(previous);
+      setError(err.message || 'Unable to delete post.');
+    }
+  }
+
+  async function handleFavorite(id, favorite) {
+    if (!id) {
+      setError('Missing post id.');
+      return;
+    }
+
+    const previous = posts;
+    setPosts((current) =>
+      current.map((post) => (post._id === id ? { ...post, favorite } : post))
+    );
+
+    try {
+      const response = await fetch(`/api/posts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorite })
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Unable to update favorite.');
+      }
+    } catch (err) {
+      setPosts(previous);
+      setError(err.message || 'Unable to update favorite.');
+    }
+  }
+  return (
+    <section className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Overview</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">Your clipboard library</h1>
+          <p className="mt-3 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+            Securely store snippets, quick notes, and copied text. Favorite the important ones so they always stay on top.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:w-auto">
+          <StatCard label="Total items" value={String(posts.length)} />
+          <StatCard label="Favorites" value={String(favoriteCount)} />
+        </div>
+      </div>
+
+      {error ? <StatusBanner tone="error" message={error} /> : null}
+
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-56 animate-pulse rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+            />
+          ))}
+        </div>
+      ) : posts.length === 0 ? (
+        <EmptyState
+          title="Nothing saved yet"
+          description="Create your first clipboard item and it will appear here."
+          actionHref="/add"
+          actionLabel="Create your first item"
+        />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {posts.map((post) => (
+            <PostCard
+              key={post._id}
+              post={post}
+              onDelete={handleDelete}
+              onToggleFavorite={handleFavorite}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function StatCard({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 
+    shadow-sm dark:border-zinc-800 dark:bg-zinc-900 
+    flex flex-row md:flex-col justify-between items-center gap-2">
+      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">{value}</p>
+    </div>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: components\posts\PostCard.jsx =====
+===== FILE CONTENT BELOW =====
+'use client';
+
+import { useMemo, useState } from 'react';
+import { FiCopy, FiExternalLink, FiHeart, FiTrash2 } from 'react-icons/fi';
+import StatusBanner from '@/components/ui/StatusBanner';
+
+export default function PostCard({ post, onDelete, onToggleFavorite }) {
+  const [message, setMessage] = useState('');
+  const [messageTone, setMessageTone] = useState('success');
+  const [expanded, setExpanded] = useState(false);
+
+  const preview = useMemo(() => {
+    if (expanded || post.content.length <= 180) {
+      return post.content;
+    }
+    return `${post.content.slice(0, 180)}â€¦`;
+  }, [expanded, post.content]);
+
+  function pushMessage(tone, text) {
+    setMessageTone(tone);
+    setMessage(text);
+    window.setTimeout(() => setMessage(''), 2200);
+  }
+
+  async function copyContent() {
+    try {
+      await navigator.clipboard.writeText(post.content);
+      pushMessage('success', 'Content copied to clipboard.');
+    } catch {
+      pushMessage('error', 'Unable to copy content.');
+    }
+  }
+
+  async function copyLink() {
+    try {
+      const url = `${window.location.origin}/${post.shareId}`;
+      await navigator.clipboard.writeText(url);
+      pushMessage('success', 'Share link copied.');
+    } catch {
+      pushMessage('error', 'Unable to copy share link.');
+    }
+  }
+
+  return (
+    <article className="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="flex items-center justify-between gap-3">
+        <div className='flex flex-row gap-2 items-center'>
+          <p className="text-s font-medium uppercase tracking-[0.18em] text-blue-400 ">{post.shareId}</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            {new Date(post.createdAt).toLocaleString()}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (!post?._id) {
+              setMessageTone('error');
+              setMessage('Missing post id.');
+              return;
+            }
+
+            onToggleFavorite(post._id, !post.favorite);
+          }}
+          disabled={!post?._id}
+          className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border transition ${post.favorite
+            ? 'border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-950 dark:bg-rose-950/40 dark:text-rose-300'
+            : 'border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:bg-zinc-800'
+            } disabled:cursor-not-allowed disabled:opacity-50`}
+          aria-label={post.favorite ? 'Remove favorite' : 'Mark as favorite'}
+        >
+          <FiHeart className={post.favorite ? 'fill-current' : ''} />
+        </button>
+      </div>
+
+      <p className="mt-4 whitespace-pre-wrap wrap-anywhere text-sm leading-6 text-zinc-700 dark:text-zinc-300">{preview}</p>
+
+      {post.content.length > 180 ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          className="mt-3 self-start text-sm font-medium text-zinc-600 transition hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100"
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      ) : null}
+
+      <div className="mt-5 flex flex-wrap justify-between">
+        <div className='flex flex-wrap gap-2'>
+          <ActionButton label="" icon={<FiCopy />} onClick={copyContent} />
+          <ActionButton label="" icon={<FiExternalLink />} onClick={copyLink} />
+        </div>
+        <ActionButton label="" icon={<FiTrash2 />} onClick={() => onDelete(post._id)} danger />
+      </div>
+
+      {message ? <div className="mt-4"><StatusBanner tone={messageTone} message={message} compact /></div> : null}
+    </article>
+  );
+}
+
+function ActionButton({ label, icon, onClick, danger = false }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium transition ${danger
+        ? 'border-red-200 text-red-700 hover:bg-red-50 dark:border-red-950 dark:text-red-300 dark:hover:bg-red-950/30'
+        : 'border-zinc-200 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-800'
+        }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: components\posts\PublicPostView.jsx =====
+===== FILE CONTENT BELOW =====
+import Link from 'next/link';
+import CopyButton from '../ui/CopyButton.jsx';
+
+export default function PublicPostView({ post }) {
+  return (
+    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-6 py-10 text-zinc-950 dark:text-zinc-50">
+      <section className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              Shared clipboard item
+            </p>
+
+            <h1 className="mt-2 text-3xl font-semibold">
+              {post.shareId}
+            </h1>
+
+            <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+              Created on {new Date(post.createdAt).toLocaleString()}
+            </p>
+          </div>
+
+          <div className='flex flex-row items-center gap-2'>
+            <CopyButton text={post.content} />
+            <Link
+            href="/"
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+          >
+            Open app
+          </Link>
+          </div>
+        </div>
+
+        
+
+        <pre className="mt-6 whitespace-pre-wrap wrap-anywhere rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm leading-6 text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
+          {post.content}
+        </pre>
+      </section>
+    </main>
+  );
+}
+===== FILE END =====
+
+===== FILE START: components\ui\AuthCard.jsx =====
+===== FILE CONTENT BELOW =====
+import Link from 'next/link';
+
+export default function AuthCard({ title, subtitle, footerText, footerLink, footerLabel, children }) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-10 dark:bg-zinc-950 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-8">
+        <div>
+          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Clipboard Vault</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">{title}</h1>
+          <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">{subtitle}</p>
+        </div>
+        <div className="mt-8">{children}</div>
+        <div className="mt-6 text-sm text-zinc-600 dark:text-zinc-400">
+          {footerText} <Link href={footerLink} className="font-medium text-zinc-950 underline-offset-4 hover:underline dark:text-zinc-50">{footerLabel}</Link>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: components\ui\CopyButton.jsx =====
+===== FILE CONTENT BELOW =====
+'use client';
+
+import { useState } from 'react';
+import { MdOutlineContentCopy } from 'react-icons/md';
+
+export default function CopyButton({ text, label = '' }) {
+  const [message, setMessage] = useState('');
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setMessage('Copied');
+
+    } catch {
+      setMessage('Unable to copy');
+    }
+
+    window.setTimeout(() => setMessage(''), 10000);
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      {message ? (
+        <span className="text-sm text-zinc-500 dark:text-zinc-400">
+          {message}
+        </span>
+      ) : null}
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-200 px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-200 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
+        aria-label={label}
+      >
+        <MdOutlineContentCopy className="h-4 w-4" />
+        {label}
+      </button>
+
+    </div>
+  );
+}
+===== FILE END =====
+
+===== FILE START: components\ui\EmptyState.jsx =====
+===== FILE CONTENT BELOW =====
+import Link from 'next/link';
+
+export default function EmptyState({ title, description, actionHref, actionLabel }) {
+  return (
+    <div className="rounded-3xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <h2 className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">{title}</h2>
+      <p className="mx-auto mt-3 max-w-md text-sm text-zinc-600 dark:text-zinc-400">{description}</p>
+      <Link
+        href={actionHref}
+        className="mt-6 inline-flex h-11 items-center justify-center rounded-2xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+      >
+        {actionLabel}
+      </Link>
+    </div>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: components\ui\LoginForm.jsx =====
+===== FILE CONTENT BELOW =====
+'use client';
+
+import Link from 'next/link';
+import { useState } from 'react';
+import { signIn } from 'next-auth/react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import StatusBanner from '@/components/ui/StatusBanner';
+
+const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_ENABLED === 'true';
+
+export default function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/';
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+
+  async function handleCredentials(event) {
+    event.preventDefault();
+    setSubmitting(true);
+    setMessage('');
+
+    const result = await signIn('credentials', {
+      redirect: false,
+      email,
+      password,
+      callbackUrl
+    });
+
+    setSubmitting(false);
+
+    if (!result || result.error) {
+      setMessage('Incorrect email or password.');
+      return;
+    }
+
+    router.push(callbackUrl);
+    router.refresh();
+  }
+
+  return (
+    <div className="space-y-4">
+      {googleEnabled ? (
+        <>
+          <button
+            type="button"
+            onClick={() => signIn('google', { callbackUrl })}
+            className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-zinc-200 px-4 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            Continue with Google
+          </button>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+            <span className="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">or</span>
+            <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+          </div>
+        </>
+      ) : null}
+
+      <form onSubmit={handleCredentials} className="space-y-4">
+        <Field label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" />
+        <Field label="Password" type="password" value={password} onChange={setPassword} autoComplete="current-password" />
+
+        <div className="flex items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('test@test.com');
+              setPassword('test1');
+            }}
+            className="text-sm font-medium text-zinc-600 transition hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-50"
+          >
+            Use guest account
+          </button>
+          <Link href="/signup" className="text-sm font-medium text-zinc-600 transition hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-50">
+            Need access?
+          </Link>
+        </div>
+
+        <button
+          type="submit"
+          disabled={submitting || !email.trim() || !password}
+          className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+        >
+          {submitting ? 'Signing inâ€¦' : 'Sign in'}
+        </button>
+      </form>
+
+      {message ? <StatusBanner tone="error" message={message} /> : null}
+    </div>
+  );
+}
+
+function Field({ label, type, value, onChange, autoComplete }) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        autoComplete={autoComplete}
+        className="mt-2 h-11 w-full rounded-2xl border border-zinc-200 bg-transparent px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-400 dark:border-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-zinc-600"
+      />
+    </label>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: components\ui\SignupForm.jsx =====
+===== FILE CONTENT BELOW =====
+'use client';
+
+import { useMemo, useState } from 'react';
+import { signIn } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import StatusBanner from '@/components/ui/StatusBanner';
+
+const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_ENABLED === 'true';
+
+export default function SignupForm() {
+  const router = useRouter();
+  const [userName, setUserName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [tone, setTone] = useState('error');
+
+  const passwordHint = useMemo(() => {
+    if (!password) return 'Use at least 8 characters with one letter and one number.';
+    return 'Looks good.';
+  }, [password]);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSubmitting(true);
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userName, email, password })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Unable to create account.');
+      }
+
+      setTone('success');
+      setMessage('Account created. Redirecting to sign inâ€¦');
+      window.setTimeout(() => router.push('/login'), 600);
+    } catch (error) {
+      setTone('error');
+      setMessage(error.message || 'Unable to create account.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {googleEnabled ? (
+        <>
+          <button
+            type="button"
+            onClick={() => signIn('google', { callbackUrl: '/' })}
+            className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-zinc-200 px-4 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            Continue with Google
+          </button>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+            <span className="text-xs uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">or</span>
+            <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+          </div>
+        </>
+      ) : null}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Field label="Username" type="text" value={userName} onChange={setUserName} autoComplete="name" />
+        <Field label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" />
+        <Field label="Password" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">{passwordHint}</p>
+
+        <button
+          type="submit"
+          disabled={submitting || !userName.trim() || !email.trim() || !password}
+          className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-zinc-950 px-4 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+        >
+          {submitting ? 'Creating accountâ€¦' : 'Create account'}
+        </button>
+      </form>
+
+      {message ? <StatusBanner tone={tone} message={message} /> : null}
+    </div>
+  );
+}
+
+function Field({ label, type, value, onChange, autoComplete }) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        autoComplete={autoComplete}
+        className="mt-2 h-11 w-full rounded-2xl border border-zinc-200 bg-transparent px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-400 dark:border-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-zinc-600"
+      />
+    </label>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: components\ui\StatusBanner.jsx =====
+===== FILE CONTENT BELOW =====
+export default function StatusBanner({ tone = 'success', message, compact = false }) {
+  const styles = {
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-300',
+    error: 'border-red-200 bg-red-50 text-red-700 dark:border-red-950 dark:bg-red-950/30 dark:text-red-300',
+    info: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-950 dark:bg-blue-950/30 dark:text-blue-300'
+  };
+
+  return (
+    <div className={`rounded-2xl border px-4 ${compact ? 'py-2 text-xs' : 'py-3 text-sm'} ${styles[tone] || styles.info}`}>
+      {message}
+    </div>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: components\ui\ThemeToggle.jsx =====
+===== FILE CONTENT BELOW =====
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useTheme } from 'next-themes';
+
+export default function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted && resolvedTheme === 'dark';
+
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-900"
+      aria-label="Toggle theme"
+    >
+      {isDark ? 'Light' : 'Dark'}
+    </button>
+  );
+}
+
+===== FILE END =====
+
+===== FILE START: lib\auth.js =====
+===== FILE CONTENT BELOW =====
+import CredentialsProvider from 'next-auth/providers/credentials';
+import GoogleProvider from 'next-auth/providers/google';
+import bcrypt from 'bcryptjs';
+import ConnectMongoDb from '@/lib/db';
+import { getRequiredEnv, getOptionalEnv } from '@/lib/env';
+import User from '@/models/User';
+
+const googleClientId = getOptionalEnv('GOOGLE_CLIENT_ID');
+const googleClientSecret = getOptionalEnv('GOOGLE_CLIENT_SECRET');
+
+const providers = [
+  CredentialsProvider({
+    name: 'Credentials',
+    credentials: {
+      email: { label: 'Email', type: 'email' },
+      password: { label: 'Password', type: 'password' }
+    },
+    async authorize(credentials) {
+      if (!credentials?.email || !credentials?.password) {
+        return null;
+      }
+
+      await ConnectMongoDb();
+      const email = String(credentials.email).trim().toLowerCase();
+      const user = await User.findOne({ email });
+
+      if (!user?.passwordHash) {
+        return null;
+      }
+
+      const valid = await bcrypt.compare(credentials.password, user.passwordHash);
+      if (!valid) {
+        return null;
+      }
+
+      return {
+        id: user._id.toString(),
+        email: user.email,
+        name: user.userName,
+        role: user.role
+      };
+    }
+  })
+];
+
+if (googleClientId && googleClientSecret) {
+  providers.unshift(
+    GoogleProvider({
+      clientId: googleClientId,
+      clientSecret: googleClientSecret
+    })
+  );
+}
+
+export const authOptions = {
+  secret: getRequiredEnv('NEXTAUTH_SECRET'),
+  session: { strategy: 'jwt' },
+  pages: { signIn: '/login' },
+  providers,
+  callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider !== 'google' || !user?.email) {
+        return true;
+      }
+
+      await ConnectMongoDb();
+      const email = user.email.trim().toLowerCase();
+      const existing = await User.findOne({ email });
+
+      if (!existing) {
+        await User.create({
+          userName: user.name || email.split('@')[0],
+          email,
+          authProviders: ['google'],
+          role: 'user'
+        });
+      } else if (!existing.authProviders.includes('google')) {
+        existing.authProviders.push('google');
+        await existing.save();
+      }
+
+      return true;
+    },
+    async jwt({ token, user }) {
+      if (user?.email) {
+        await ConnectMongoDb();
+        const dbUser = await User.findOne({ email: user.email.trim().toLowerCase() });
+        if (dbUser) {
+          token.userId = dbUser._id.toString();
+          token.role = dbUser.role;
+          token.name = dbUser.userName;
+        }
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.userId = token.userId;
+        session.user.role = token.role;
+        session.user.name = token.name || session.user.name;
+      }
+      return session;
+    }
+  }
+};
+
+===== FILE END =====
+
+===== FILE START: lib\db.js =====
+===== FILE CONTENT BELOW =====
+import mongoose from 'mongoose';
+
+const MONGO_URI = process.env.MONGO_URI;
+
+if (!MONGO_URI) {
+  throw new Error('Missing environment variable: MONGO_URI');
+}
+
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
+export default async function ConnectMongoDb() {
+  if (cached.conn) {
+    return cached.conn;
+  }
+
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(MONGO_URI, { bufferCommands: false }).then((mongooseInstance) => mongooseInstance);
+  }
+
+  cached.conn = await cached.promise;
+  return cached.conn;
+}
+
+===== FILE END =====
+
+===== FILE START: lib\env.js =====
+===== FILE CONTENT BELOW =====
+export function getRequiredEnv(key) {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(`Missing environment variable: ${key}`);
+  }
+  return value;
+}
+
+export function getOptionalEnv(key) {
+  return process.env[key] || '';
+}
+
+===== FILE END =====
+
+===== FILE START: lib\ids.js =====
+===== FILE CONTENT BELOW =====
+import crypto from 'crypto';
+
+export function createShareId(length = 4) {
+  return crypto.randomBytes(length).toString('base64url').replace(/[^A-Za-z0-9]/g, '').slice(0, length).toUpperCase();
+}
+
+===== FILE END =====
+
+===== FILE START: lib\session.js =====
+===== FILE CONTENT BELOW =====
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+
+export async function requireUserSession() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.userId) {
+    throw new Error('Unauthorized');
+  }
+  return session;
+}
+
+===== FILE END =====
+
+===== FILE START: lib\validators.js =====
+===== FILE CONTENT BELOW =====
+export function validateSignupInput(payload) {
+  const userName = String(payload?.userName || '').trim();
+  const email = String(payload?.email || '').trim().toLowerCase();
+  const password = String(payload?.password || '');
+
+  if (userName.length < 3 || userName.length > 50) {
+    throw new Error('Invalid username. Use 3 to 50 characters.');
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('Invalid email address.');
+  }
+
+  const hasLetter = /[A-Za-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  if (password.length < 8 || !hasLetter || !hasNumber || /\s/.test(password)) {
+    throw new Error('Invalid password. Use at least 8 characters with one letter and one number and no spaces.');
+  }
+
+  return { userName, email, password };
+}
+
+export function validatePostContent(content) {
+  const value = String(content || '').trim();
+  if (!value) {
+    throw new Error('Invalid content. Content is required.');
+  }
+  if (value.length > 5000) {
+    throw new Error('Invalid content. Maximum length is 5000 characters.');
+  }
+  return value;
+}
+
+export function validateFavoriteFlag(value) {
+  if (typeof value !== 'boolean') {
+    throw new Error('Invalid favorite value.');
+  }
+  return value;
+}
+
+===== FILE END =====
+

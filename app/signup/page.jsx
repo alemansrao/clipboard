@@ -2,9 +2,9 @@ import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import AuthCard from '@/components/ui/AuthCard';
-import LoginForm from '@/components/ui/LoginForm';
+import SignupForm from '@/components/ui/SignupForm';
 
-export default async function LoginPage() {
+export default async function SignupPage() {
   const session = await getServerSession(authOptions);
   if (session?.user?.userId) {
     redirect('/');
@@ -12,13 +12,13 @@ export default async function LoginPage() {
 
   return (
     <AuthCard
-      title="Welcome back"
-      subtitle="Sign in with Google or your email and password."
-      footerText="New here?"
-      footerLink="/signup"
-      footerLabel="Create an account"
+      title="Create your account"
+      subtitle="A minimal clipboard manager with secure sharing."
+      footerText="Already have an account?"
+      footerLink="/login"
+      footerLabel="Sign in"
     >
-      <LoginForm />
+      <SignupForm />
     </AuthCard>
   );
 }

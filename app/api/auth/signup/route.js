@@ -1,30 +1,35 @@
-import ConnectMongoDb from "@/lib/mongodb";
-import Users from "@/models/users";
-import bcrypt from "bcryptjs";
-import { NextResponse } from "next/server";
+import bcrypt from 'bcryptjs';
+import { NextResponse } from 'next/server';
+import ConnectMongoDb from '@/lib/db';
+import { validateSignupInput } from '@/lib/validators';
+import User from '@/models/User';
 
 export async function POST(request) {
   try {
-    const { user_name, email, password, phone_number } = await request.json();
-    if (!user_name || !email || !password || !phone_number) {
-      return NextResponse.json({ error: "All fields are required" }, { status: 400 });
-    }
+    const payload = await request.json();
+    const parsed = validateSignupInput(payload);
+
     await ConnectMongoDb();
-    const existing = await Users.findOne({ email });
-    if (existing) {
-      return NextResponse.json({ error: "User with this email already registered" }, { status: 409 });
+    const existingUser = await User.findOne({ email: parsed.email });
+
+    if (existingUser) {
+      return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 });
     }
-    const hashed = await bcrypt.hash(password, 10);
-    const user = await Users.create({
-      user_name,
-      email,
-      password: hashed,
-      role: "User",
-      phone_number, // needs to be collected from signup form
+
+    const passwordHash = await bcrypt.hash(parsed.password, 12);
+
+    await User.create({
+      userName: parsed.userName,
+      email: parsed.email,
+      passwordHash,
+      authProviders: ['credentials'],
+      role: 'user'
     });
-    return NextResponse.json({ message: "Signup successful" }, { status: 201 });
-  } catch (e) {
-    console.error("Signup error:", e);
-    return NextResponse.json({ error: "Signup failed" }, { status: 500 });
+
+    return NextResponse.json({ message: 'Account created successfully.' }, { status: 201 });
+  } catch (error) {
+    const message = error?.message || 'Unable to create account.';
+    const status = message.includes('Invalid') ? 400 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
