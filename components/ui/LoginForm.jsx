@@ -99,7 +99,7 @@ export default function LoginForm() {
           type="button"
           onClick={() => {
             setEmail('test@test.com');
-            setPassword('test1');
+            setPassword('test@123');
           }}
           className="text-sm font-medium text-zinc-600 transition hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-50"
         >

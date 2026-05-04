@@ -20,7 +20,15 @@ export default function SignupForm() {
     if (!password) return 'Use at least 8 characters with one letter and one number.';
     return 'Looks good.';
   }, [password]);
-
+  async function handleGoogleLogin() {
+    try {
+      await signIn('google', { callbackUrl: '/' });
+    } catch (error) {
+      console.error('[Google Signup Error]', error);
+      setTone('error');
+      setMessage('Unable to continue with Google.');
+    }
+  }
   async function handleSubmit(event) {
     event.preventDefault();
     setSubmitting(true);

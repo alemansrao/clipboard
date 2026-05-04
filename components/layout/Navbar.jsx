@@ -27,11 +27,10 @@ export default function Navbar({ session }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`rounded-xl px-3 py-2 text-sm transition ${
-                    active
+                  className={`rounded-xl px-3 py-2 text-sm transition ${active
                       ? 'bg-zinc-950 text-white dark:bg-zinc-100 dark:text-zinc-950'
                       : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
-                  }`}
+                    }`}
                 >
                   {item.label}
                 </Link>
@@ -41,10 +40,10 @@ export default function Navbar({ session }) {
         </div>
 
         <div className="flex items-center gap-3">
-          <ThemeToggle />
           {session?.user?.name ? (
             <span className="hidden text-sm text-zinc-500 dark:text-zinc-400 sm:inline">{session.user.name}</span>
           ) : null}
+          <ThemeToggle />
           {session?.user?.userId ? (
             <button
               type="button"
@@ -72,11 +71,10 @@ export default function Navbar({ session }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`rounded-xl px-3 py-2 text-sm transition ${
-                  active
+                className={`rounded-xl px-3 py-2 text-sm transition ${active
                     ? 'bg-zinc-950 text-white dark:bg-zinc-100 dark:text-zinc-950'
                     : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
-                }`}
+                  }`}
               >
                 {item.label}
               </Link>
