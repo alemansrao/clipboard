@@ -1,12 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FiCopy, FiExternalLink, FiHeart, FiTrash2 } from 'react-icons/fi';
 import StatusBanner from '@/components/ui/StatusBanner';
 
 export default function PostCard({ post, onDelete, onToggleFavorite }) {
   const [message, setMessage] = useState('');
   const [messageTone, setMessageTone] = useState('success');
+  const [expanded, setExpanded] = useState(false);
+
+  const preview = useMemo(() => {
+    if (expanded || post.content.length <= 180) {
+      return post.content;
+    }
+    return `${post.content.slice(0, 180)}…`;
+  }, [expanded, post.content]);
 
   function pushMessage(tone, text) {
     setMessageTone(tone);
@@ -34,9 +42,7 @@ export default function PostCard({ post, onDelete, onToggleFavorite }) {
   }
 
   return (
-    <article className="flex md:h-60 h-52 flex-col rounded-3xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-
-    {/* <article className="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"> */}
+    <article className="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900">
       <div className="flex items-center justify-between gap-3">
         <div className='flex flex-row gap-2 items-center'>
           <p className="text-s font-medium uppercase tracking-[0.18em] text-blue-400 ">{post.shareId}</p>
@@ -66,13 +72,19 @@ export default function PostCard({ post, onDelete, onToggleFavorite }) {
         </button>
       </div>
 
-      <div className=" min-h-0 flex-1 overflow-y-auto pr-2">
-        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-zinc-700 dark:text-zinc-300">
-          {post.content}
-        </p>
-      </div>
+      <p className="mt-4 whitespace-pre-wrap wrap-anywhere text-sm leading-6 text-zinc-700 dark:text-zinc-300">{preview}</p>
 
-      <div className="mt-1 flex flex-wrap justify-between">
+      {post.content.length > 180 ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          className="mt-3 self-start text-sm font-medium text-zinc-600 transition hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100"
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      ) : null}
+
+      <div className="mt-5 flex flex-wrap justify-between">
         <div className='flex flex-wrap gap-2'>
           <ActionButton label="" icon={<FiCopy />} onClick={copyContent} />
           <ActionButton label="" icon={<FiExternalLink />} onClick={copyLink} />
