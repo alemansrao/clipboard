@@ -5,7 +5,7 @@ import { Providers } from './providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'Clipboard Vault',
+  title: 'ClipBoard',
   description: 'A secure and minimal clipboard manager.'
 };
 

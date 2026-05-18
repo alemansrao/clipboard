@@ -16,9 +16,9 @@ export default function Navbar({ session }) {
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-zinc-50/90 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-950/90">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-            Clipboard Vault
+        <div className="flex items-center gap-3">
+          <Link href="/" className="text-md font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+            ClipBoard
           </Link>
           <nav className="hidden items-center gap-2 md:flex">
             {items.map((item) => {
@@ -28,8 +28,8 @@ export default function Navbar({ session }) {
                   key={item.href}
                   href={item.href}
                   className={`rounded-xl px-3 py-2 text-sm transition ${active
-                      ? 'bg-zinc-950 text-white dark:bg-zinc-100 dark:text-zinc-950'
-                      : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
+                    ? 'bg-zinc-950 text-white dark:bg-zinc-100 dark:text-zinc-950'
+                    : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
                     }`}
                 >
                   {item.label}
@@ -37,6 +37,25 @@ export default function Navbar({ session }) {
               );
             })}
           </nav>
+          <div className="border-t border-zinc-200 px-4 py-3 md:hidden dark:border-zinc-800">
+            <nav className="flex items-center gap-2">
+              {items.map((item) => {
+                const active = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`rounded-xl px-3 py-2 text-sm transition ${active
+                      ? 'bg-zinc-950 text-white dark:bg-zinc-100 dark:text-zinc-950'
+                      : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
+                      }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -63,25 +82,7 @@ export default function Navbar({ session }) {
         </div>
       </div>
 
-      <div className="border-t border-zinc-200 px-4 py-3 md:hidden dark:border-zinc-800">
-        <nav className="flex items-center gap-2">
-          {items.map((item) => {
-            const active = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`rounded-xl px-3 py-2 text-sm transition ${active
-                    ? 'bg-zinc-950 text-white dark:bg-zinc-100 dark:text-zinc-950'
-                    : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
-                  }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
+
     </header>
   );
 }

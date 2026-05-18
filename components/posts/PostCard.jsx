@@ -42,7 +42,7 @@ export default function PostCard({ post, onDelete, onToggleFavorite }) {
   }
 
   return (
-    <article className="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900">
+    <article className="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900">
       <div className="flex items-center justify-between gap-3">
         <div className='flex flex-row gap-2 items-center'>
           <p className="text-s font-medium uppercase tracking-[0.18em] text-blue-400 ">{post.shareId}</p>
@@ -72,9 +72,9 @@ export default function PostCard({ post, onDelete, onToggleFavorite }) {
         </button>
       </div>
 
-      <p className="mt-4 whitespace-pre-wrap wrap-anywhere text-sm leading-6 text-zinc-700 dark:text-zinc-300">{preview}</p>
+      <p className="mt-1 h-24 overflow-y-auto whitespace-pre-wrap wrap-anywhere text-sm leading-6 text-zinc-700 dark:text-zinc-300">{post.content}</p>
 
-      {post.content.length > 180 ? (
+      {/* {post.content.length > 180 ? (
         <button
           type="button"
           onClick={() => setExpanded((current) => !current)}
@@ -82,17 +82,20 @@ export default function PostCard({ post, onDelete, onToggleFavorite }) {
         >
           {expanded ? 'Show less' : 'Show more'}
         </button>
-      ) : null}
+      ) : null} */}
 
-      <div className="mt-5 flex flex-wrap justify-between">
+      <div className="mt-1 flex flex-wrap justify-between">
         <div className='flex flex-wrap gap-2'>
           <ActionButton label="" icon={<FiCopy />} onClick={copyContent} />
           <ActionButton label="" icon={<FiExternalLink />} onClick={copyLink} />
         </div>
+        {message ? <div className="mt-1">
+          <StatusBanner tone={messageTone} message={message} compact />
+        </div> : null}
         <ActionButton label="" icon={<FiTrash2 />} onClick={() => onDelete(post._id)} danger />
       </div>
 
-      {message ? <div className="mt-4"><StatusBanner tone={messageTone} message={message} compact /></div> : null}
+
     </article>
   );
 }
