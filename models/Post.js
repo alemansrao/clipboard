@@ -13,7 +13,7 @@ const postSchema = new Schema(
     content: {
       type: String,
       required: true,
-      maxlength: 5000
+      maxlength: 10000
     },
     favorite: {
       type: Boolean,
