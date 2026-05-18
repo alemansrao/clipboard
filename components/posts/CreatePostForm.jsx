@@ -11,7 +11,7 @@ export default function CreatePostForm() {
   const [message, setMessage] = useState('');
   const [tone, setTone] = useState('success');
   const formRef = useRef(null);
-  const remaining = useMemo(() => 5000 - content.length, [content.length]);
+  const remaining = useMemo(() => 10000 - content.length, [content.length]);
 
   const pasteFromClipboard = async () => {
     try {
@@ -83,7 +83,7 @@ export default function CreatePostForm() {
           value={content}
           onChange={(event) => setContent(event.target.value)}
           placeholder="Paste your content here"
-          rows={14}
+          rows={6}
           maxLength={10000}
           className="mt-3 w-full rounded-2xl border border-zinc-200 bg-transparent px-4 py-3 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-400 dark:border-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-zinc-600"
         />
