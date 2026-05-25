@@ -6,7 +6,7 @@ import { signOut } from 'next-auth/react';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 
 const items = [
-  { href: '/', label: 'Dashboard' },
+  // { href: '/', label: 'Dashboard' },
   { href: '/add', label: 'Create' }
 ];
 
@@ -37,6 +37,7 @@ export default function Navbar({ session }) {
               );
             })}
           </nav>
+          {/* Mobile displays */}
           <div className="border-t border-zinc-200 px-4 py-3 md:hidden dark:border-zinc-800">
             <nav className="flex items-center gap-2">
               {items.map((item) => {
