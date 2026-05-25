@@ -38,7 +38,7 @@ export default function Navbar({ session }) {
             })}
           </nav>
           {/* Mobile displays */}
-          <div className="border-t border-zinc-200 px-4 py-3 md:hidden dark:border-zinc-800">
+          <div className="px-4 py-3 md:hidden">
             <nav className="flex items-center gap-2">
               {items.map((item) => {
                 const active = pathname === item.href;
